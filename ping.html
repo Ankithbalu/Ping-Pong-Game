@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Ping Pong</title>
+
+
+	<style>
+		@import url('https://fonts.googleapis.com/css?family=VT323');
+
+		body {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			background-color: gold;
+		}
+
+		canvas {
+			display: block;
+			position: absolute;
+			margin: auto;
+			top: 0;
+			bottom: 0;
+			left: 0;
+			right: 0;
+		}
+		
+		h1 {
+			margin-top: 35px;
+			text-align: center;
+			color: yellow;
+		}
+
+		.lose-text {
+			font-family: 'VT323', monospace;
+			font-size: 15vw;
+			text-shadow: 0px 0px 30px RED;
+		}
+	</style>
+</head>
+<body>
+<script>
+var
+
+
+WIDTH  = 800,
+HEIGHT = 400,
+
+pi = Math.PI,
+
+UpArrow   = 38,
+DownArrow = 40,
+
+
+canvas,
+ctx,
+keystate,
+
+
+player = {
+	x: null,
+	y: null,
+
+	width:  50,
+	height: 100,
+
+
+	update: function() {
+		if (keystate[UpArrow]) this.y -= 7;
+		if (keystate[DownArrow]) this.y += 7;
+		
+		this.y = Math.max(Math.min(this.y, HEIGHT - this.height), 0);
+	},
+
+	
+	draw: function() {
+		ctx.fillRect(this.x, this.y, this.width, this.height);
+	}
+},
+
+
+ai = {
+	x: null,
+	y: null,
+
+	width:  50,
+	height: 100,
+
+	score: 0,
+
+
+	update: function() {
+		
+		var desty = ball.y - (this.height - ball.side)*0.5;
+		
+		this.y += (desty - this.y) * 0.1;
+		
+		this.y = Math.max(Math.min(this.y, HEIGHT - this.height), 0);
+	},
+
+	
+	draw: function() {
+		ctx.fillRect(this.x, this.y, this.width, this.height);
+	}
+},
+
+
+ball = {
+	x:   null,
+	y:   null,
+	vel: null,
+
+	side:  20,
+	speed: 7,
+
+	/**
+	 * Serves the ball towards the specified side
+	 * 
+	 * @param  {number} side 1 right
+	 *                       -1 left
+	 */
+	serve: function(side) {
+		
+		var r = Math.random();
+		this.x = side===1 ? player.x+player.width : ai.x - this.side;
+		this.y = (HEIGHT - this.side)*r;
+		
+		var phi = 0.1*pi*(1 - 2*r);
+		
+		this.vel = {
+			x: side*this.speed*Math.cos(phi),
+			y: this.speed*Math.sin(phi)
+		}
+	},
+
+
+	update: function() {
+		
+		this.x += this.vel.x;
+		this.y += this.vel.y;
+	
+		if (0 > this.y || this.y+this.side > HEIGHT) {
+			
+			var offset = this.vel.y < 0 ? 0 - this.y : HEIGHT - (this.y+this.side);
+			this.y += 2*offset;
+			
+			this.vel.y *= -1;
+		}
+	
+		var AABBIntersect = function(ax, ay, aw, ah, bx, by, bw, bh) {
+			return ax < bx+bw && ay < by+bh && bx < ax+aw && by < ay+ah;
+		};
+
+		
+		var pdle = this.vel.x < 0 ? player : ai;
+		if (AABBIntersect(pdle.x, pdle.y, pdle.width, pdle.height,
+				this.x, this.y, this.side, this.side)
+		) {	
+			
+			this.x = pdle===player ? player.x+player.width : ai.x - this.side;
+			var n = (this.y+this.side - pdle.y)/(pdle.height+this.side);
+			var phi = 0.25*pi*(2*n - 1); 
+			
+			var smash = Math.abs(phi) > 0.2*pi ? 1.5 : 1;
+			this.vel.x = smash*(pdle===player ? 1 : -1)*this.speed*Math.cos(phi);
+			this.vel.y = smash*this.speed*Math.sin(phi);
+
+		
+		if (0 > this.x + this.side || this.x > WIDTH) {
+              if (ai.score === 20) {
+                document.body.removeChild(canvas);
+                document.body.removeChild(score);
+                document.body.removeChild(announce);
+                document.body.style.backgroundColor = "black";
+
+                const loseText = document.createElement("h1");
+                loseText.className = "lose-text";
+                loseText.textContent = "YOU LOST TO ALI";
+                document.body.appendChild(loseText);
+              }
+              ai.score++;
+              score.textContent = ai.score;
+
+              announce.textContent =
+                ai.score === 1
+                  ? "AI has scored a point!"
+                  : "AI has scored another point!";
+
+              setTimeout(() => {
+                announce.textContent = "";
+              }, 2000);
+
+              this.serve(pdle === player ? 1 : -1);
+            }
+          }
+			
+		
+
+		
+		if (0 > this.x+this.side || this.x > WIDTH) {
+			if (ai.score === 5) {
+				document.body.removeChild(canvas);
+				document.body.removeChild(score);
+
+				document.body.style.backgroundColor = "black";
+
+				const loseText = document.createElement("h1");
+				loseText.className = "lose-text";
+				loseText.textContent = "AI has defeated you!";
+				document.body.appendChild(loseText);
+			}
+			ai.score++;
+			score.textContent = ai.score;
+			this.serve(pdle===player ? 1 : -1);
+		}
+	},
+
+
+	
+	draw: function() {
+		ctx.fillRect(this.x, this.y, this.side, this.side);
+	}
+};
+
+
+function main() {
+	
+	canvas = document.createElement("canvas");
+	canvas.width = WIDTH;
+	canvas.height = HEIGHT;
+	ctx = canvas.getContext("2d");
+	document.body.appendChild(canvas);
+
+	score = document.createElement("h1");
+	score.textContent = "POINTS"
+	document.body.appendChild(score);
+	
+	announce = document.createElement("h1");
+        announce.textContent = "";
+        document.body.appendChild(announce);
+	keystate = {};
+	
+	document.addEventListener("keydown", function(evt) {
+		keystate[evt.keyCode] = true;
+	});
+	document.addEventListener("keyup", function(evt) {
+		delete keystate[evt.keyCode];
+	});
+
+	init(); 
+
+	
+	var loop = function() {
+		update();
+		draw();
+
+		window.requestAnimationFrame(loop, canvas);
+	};
+	window.requestAnimationFrame(loop, canvas);
+}
+
+
+function init() {
+	player.x = player.width;
+	player.y = (HEIGHT - player.height)/2;
+
+	ai.x = WIDTH - (player.width + ai.width);
+	ai.y = (HEIGHT - ai.height)/2;
+
+	ball.serve(1);
+}
+
+
+function update() {
+	ball.update();
+	player.update();
+	ai.update();
+}
+
+
+function draw() {
+	ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+	ctx.save();
+
+	ctx.fillStyle = "#0e6f14";
+
+	ball.draw();
+	player.draw();
+	ai.draw();
+
+
+	var w = 4;
+	var x = (WIDTH - w)*0.5;
+	var y = 0;
+	var step = HEIGHT/20; 
+	while (y < HEIGHT) {
+		ctx.fillRect(x, y+step*0.25, w, step*0.5);
+		y += step;
+	}
+
+	ctx.restore();
+}
+
+
+main();
+</script>
+</body>
+</html>
